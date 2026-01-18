@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+.venv
+venv/
+conda/
+
+# Data
+data/
+datasets/
+*.nii
+*.nii.gz
+
+# Outputs
+runs/
+outputs/
+checkpoints/
+*.pth
+*.pt
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
+
+# Large datasets / archives
+*.tar
+*.tar.gz
+*.zip
+
+# BraTS data
+BraTS*/
+data/
+datasets/
+
+# Cache
+cache/
