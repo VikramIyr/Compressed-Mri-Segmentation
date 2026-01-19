@@ -8,19 +8,6 @@ __pycache__/
 venv/
 conda/
 
-# Data
-data/
-datasets/
-*.nii
-*.nii.gz
-
-# Outputs
-runs/
-outputs/
-checkpoints/
-*.pth
-*.pt
-
 # OS / editor
 .DS_Store
 .vscode/
@@ -31,10 +18,40 @@ checkpoints/
 *.tar.gz
 *.zip
 
-# BraTS data
+# Medical data
+*.nii
+*.nii.gz
+
+# BraTS data (safety)
 BraTS*/
-data/
-datasets/
 
 # Cache
 cache/
+
+# =========================
+# Keep empty folders, ignore contents
+# =========================
+
+# data folder
+data/*
+!data/.gitkeep
+
+# datasets folder (if you want it to exist too)
+datasets/*
+!datasets/.gitkeep
+
+# runs folder
+runs/*
+!runs/.gitkeep
+
+# figures folder
+figures/*
+!figures/.gitkeep
+
+# outputs / checkpoints (fully ignored, no folder needed)
+outputs/
+checkpoints/
+
+# PyTorch weights
+*.pth
+*.pt
