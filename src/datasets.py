@@ -10,10 +10,6 @@ import torch
 from torch.utils.data import Dataset
 
 
-# -------------------------
-# Utilities
-# -------------------------
-
 def set_seed(seed: int):
     random.seed(seed)
     np.random.seed(seed)
@@ -27,61 +23,43 @@ def load_nifti(path: str) -> np.ndarray:
 
 
 def robust_normalize(x: np.ndarray, eps: float = 1e-6) -> np.ndarray:
-    """
-    Robust per-slice normalization:
-      - clip to [p1, p99]
-      - z-score
-    """
+    
     p1, p99 = np.percentile(x, (1, 99))
     x = np.clip(x, p1, p99)
     return (x - x.mean()) / (x.std() + eps)
 
 
 def resize_bilinear(img: np.ndarray, out_hw: Tuple[int, int]) -> np.ndarray:
-    """
-    Bilinear resize for images.
-    Supports:
-      - (H,W)
-      - (C,H,W)
-    Returns:
-      - (H,W) or (C,H,W) respectively
-    """
+    
     import torch.nn.functional as F
 
     t = torch.from_numpy(img).float()
     if t.ndim == 2:
-        t = t[None, None]      # (1,1,H,W)
+        t = t[None, None]     
         t = F.interpolate(t, size=out_hw, mode="bilinear", align_corners=False)
-        return t.squeeze(0).squeeze(0).numpy()  # (H,W)
+        return t.squeeze(0).squeeze(0).numpy()  
 
     if t.ndim == 3:
-        t = t[None]            # (1,C,H,W)
+        t = t[None]            
         t = F.interpolate(t, size=out_hw, mode="bilinear", align_corners=False)
-        return t.squeeze(0).numpy()             # (C,H,W)
+        return t.squeeze(0).numpy()             
 
     raise ValueError(f"resize_bilinear expects 2D or 3D array, got shape {img.shape}")
 
 
 def resize_nn_mask(mask: np.ndarray, out_hw: Tuple[int, int]) -> np.ndarray:
-    """
-    Nearest-neighbor resize for masks.
-    Input:  (H,W)
-    Output: (H,W)
-    """
+    
     import torch.nn.functional as F
 
     if mask.ndim != 2:
         raise ValueError(f"resize_nn_mask expects (H,W), got {mask.shape}")
 
-    t = torch.from_numpy(mask).float()[None, None]  # (1,1,H,W)
+    t = torch.from_numpy(mask).float()[None, None]  
     t = F.interpolate(t, size=out_hw, mode="nearest")
-    out = t.squeeze(0).squeeze(0).numpy()           # (H,W)
-    return out
+    out = t.squeeze(0).squeeze(0).numpy()           
 
 
-# -------------------------
-# Case indexing
-# -------------------------
+
 
 @dataclass(frozen=True)
 class Case:
@@ -91,15 +69,7 @@ class Case:
 
 
 def build_brats_index(root: str, modalities: List[str]) -> List[Case]:
-    """
-    root should contain folders like:
-      data/BraTS2021_00000/
-        *_flair.nii.gz
-        *_t1ce.nii.gz
-        *_t1.nii.gz
-        *_t2.nii.gz
-        *_seg.nii.gz
-    """
+    
     cases: List[Case] = []
 
     for d in sorted(os.listdir(root)):
@@ -111,7 +81,7 @@ def build_brats_index(root: str, modalities: List[str]) -> List[Case]:
             mods = {m: glob.glob(os.path.join(case_dir, f"*_{m}.nii.gz"))[0] for m in modalities}
             seg = glob.glob(os.path.join(case_dir, "*_seg.nii.gz"))[0]
         except IndexError:
-            # Skip folders that aren't BraTS cases
+            
             continue
 
         cases.append(Case(case_id=d, modalities=mods, seg=seg))
@@ -135,18 +105,10 @@ def split_cases(
     return train, val
 
 
-# -------------------------
-# Dataset
-# -------------------------
+
 
 class Brats2DSliceDataset(Dataset):
-    """
-    BraTS → 2D slice dataset with compression options.
-    Returns:
-      img:  FloatTensor (C,H,W)
-      mask: LongTensor  (H,W)
-      meta: dict
-    """
+    
 
     def __init__(
         self,
@@ -181,7 +143,7 @@ class Brats2DSliceDataset(Dataset):
         self.index = self._load_or_build_index()
 
     def _cache_path(self) -> str:
-        # Include key params that affect which slices are included
+        
         case_hash = f"n{len(self.cases)}"
         key = f"{case_hash}_axis{self.slice_axis}_stride{self.slice_stride}_keep{int(self.keep_empty)}_er{self.empty_ratio}_seed{self.seed}"
         return os.path.join(self.cache_dir, f"slice_index_{key}.pkl")
@@ -227,32 +189,32 @@ class Brats2DSliceDataset(Dataset):
         ci, s = self.index[i]
         case = self.cases[ci]
 
-        # Load modalities slice
+        
         imgs = []
         for m in self.modalities:
             vol = load_nifti(case.modalities[m]).astype(np.float32)
-            sl = np.take(vol, s, axis=self.slice_axis)  # (H,W)
+            sl = np.take(vol, s, axis=self.slice_axis)  
             sl = robust_normalize(sl)
             imgs.append(sl)
 
-        img = np.stack(imgs, axis=0)  # (C,H,W)
+        img = np.stack(imgs, axis=0)  
 
-        # Load mask slice
+        
         seg = load_nifti(case.seg).astype(np.int16)
-        mask = np.take(seg, s, axis=self.slice_axis)  # (H,W)
+        mask = np.take(seg, s, axis=self.slice_axis)  
 
-        # Optional spatial downsample (compression)
+        
         if self.downsample > 1:
             h, w = mask.shape
             new_hw = (max(1, h // self.downsample), max(1, w // self.downsample))
-            img = resize_bilinear(img, new_hw)       # (C,h',w')
-            mask = resize_nn_mask(mask, new_hw)      # (h',w')
+            img = resize_bilinear(img, new_hw)       
+            mask = resize_nn_mask(mask, new_hw)      
 
-        # Resize to fixed size for batching
-        img = resize_bilinear(img, self.target_hw)   # (C,H,W)
-        mask = resize_nn_mask(mask, self.target_hw)  # (H,W)
+        
+        img = resize_bilinear(img, self.target_hw)   
+        mask = resize_nn_mask(mask, self.target_hw)  
 
-        # Tensors
+        
         img_t = torch.from_numpy(img).float()
         mask_t = torch.from_numpy(mask).long()
 

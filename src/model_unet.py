@@ -49,10 +49,7 @@ class Up(nn.Module):
 
 
 class UNet(nn.Module):
-    """
-    Minimal UNet for 2D segmentation.
-    out_channels=1 for binary (logits).
-    """
+    
     def __init__(self, in_channels=1, out_channels=1, base=32):
         super().__init__()
         self.inc = DoubleConv(in_channels, base)

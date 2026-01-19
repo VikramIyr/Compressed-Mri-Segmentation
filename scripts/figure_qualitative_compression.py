@@ -9,9 +9,7 @@ import matplotlib.pyplot as plt
 import nibabel as nib
 
 
-# -------------------------
-# Utils: preprocessing
-# -------------------------
+
 def percentile_clip_zscore(img: np.ndarray, p_low=1, p_high=99, eps=1e-8) -> np.ndarray:
     lo = np.percentile(img, p_low)
     hi = np.percentile(img, p_high)
@@ -22,20 +20,17 @@ def percentile_clip_zscore(img: np.ndarray, p_low=1, p_high=99, eps=1e-8) -> np.
 
 
 def downsample_then_resize(img: np.ndarray, downsample: int, target_hw=(240, 240)) -> np.ndarray:
-    """
-    Mimic "downsample by factor r prior to resizing to 240x240".
-    Uses torch bilinear interpolate for simplicity and consistency.
-    """
-    x = torch.from_numpy(img).float()[None, None]  # [1,1,H,W]
 
-    # Step 1: downsample by factor r (if r>1)
+    x = torch.from_numpy(img).float()[None, None]  
+
+    
     if downsample > 1:
         h, w = x.shape[-2:]
         h2 = max(1, h // downsample)
         w2 = max(1, w // downsample)
         x = F.interpolate(x, size=(h2, w2), mode="bilinear", align_corners=False)
 
-    # Step 2: resize to target_hw
+   
     x = F.interpolate(x, size=target_hw, mode="bilinear", align_corners=False)
     return x[0, 0].cpu().numpy()
 
@@ -46,7 +41,7 @@ def resize_mask_nearest(mask: np.ndarray, downsample: int, target_hw=(240, 240))
       - downsample by r (nearest, to preserve labels)
       - resize to target (nearest)
     """
-    x = torch.from_numpy(mask.astype(np.float32))[None, None]  # [1,1,H,W]
+    x = torch.from_numpy(mask.astype(np.float32))[None, None]  
 
     if downsample > 1:
         h, w = x.shape[-2:]
@@ -58,9 +53,7 @@ def resize_mask_nearest(mask: np.ndarray, downsample: int, target_hw=(240, 240))
     return (x[0, 0].cpu().numpy() > 0.5).astype(np.uint8)
 
 
-# -------------------------
-# Utils: metrics
-# -------------------------
+
 def _safe_div(num: float, den: float, eps: float = 1e-8) -> float:
     return float(num) / float(den + eps)
 
@@ -85,14 +78,11 @@ def compute_binary_metrics(gt: np.ndarray, pred: np.ndarray, eps: float = 1e-8) 
     return {"dice": dice, "iou": iou, "precision": precision, "recall": recall}
 
 
-# -------------------------
-# Model loading (matches your eval.py style)
-# -------------------------
+
 def build_model_from_train_py(in_channels: int):
     try:
-        from src.model_unet import UNet  # recommended import
+        from src.model_unet import UNet  
     except ModuleNotFoundError:
-        # fallback if someone runs from inside src/ or has src on PYTHONPATH
         from model_unet import UNet
     return UNet(in_channels=in_channels, out_channels=1, base=32)
 
@@ -115,7 +105,6 @@ def load_checkpoint_to_model(model, ckpt_path: str, device="cpu"):
     else:
         raise RuntimeError(f"Unrecognized checkpoint object type: {type(ckpt)}")
 
-    # strip common prefixes if needed
     model_keys = set(model.state_dict().keys())
     state_keys = set(state.keys())
     if len(model_keys.intersection(state_keys)) == 0:
@@ -140,7 +129,7 @@ def predict_mask(
     img_240: [H,W] already normalized/resized
     returns binary mask [H,W]
     """
-    x = torch.from_numpy(img_240).float()[None, None].to(device)  # [1,1,240,240]
+    x = torch.from_numpy(img_240).float()[None, None].to(device)  
     logits = model(x)
     if logits.ndim == 4:
         logits = logits[:, 0]
@@ -149,9 +138,6 @@ def predict_mask(
     return pred[0].cpu().numpy()
 
 
-# -------------------------
-# Data loading
-# -------------------------
 def find_case_dir(data_root: str, case_id: str) -> str:
     case_dir = os.path.join(data_root, case_id)
     if not os.path.isdir(case_dir):
@@ -160,8 +146,7 @@ def find_case_dir(data_root: str, case_id: str) -> str:
 
 
 def load_modality_slice(case_dir: str, modality: str, slice_idx: int) -> np.ndarray:
-    # typical BraTS naming includes "_flair.nii.gz", "_t1ce.nii.gz", etc.
-    # we search for "*_{modality}.nii*" within the case folder
+
     cand = None
     for fn in os.listdir(case_dir):
         lower = fn.lower()
@@ -194,15 +179,11 @@ def load_seg_slice(case_dir: str, slice_idx: int) -> np.ndarray:
     return (seg[:, :, slice_idx] > 0).astype(np.uint8)
 
 
-# -------------------------
-# Figure
-# -------------------------
+
 def overlay_contours(ax, img, gt_mask, pred_mask, title: str):
     ax.imshow(img, cmap="gray")
-
-    # Explicit colors so legend matches the plot.
-    gt_color = "lime"  # GT = green
-    pr_color = "red"   # Pred = red
+    gt_color = "lime"  
+    pr_color = "red"   
 
     ax.contour(
         gt_mask.astype(float),
@@ -225,13 +206,11 @@ def overlay_contours(ax, img, gt_mask, pred_mask, title: str):
 def main(args):
     os.makedirs(args.out_dir, exist_ok=True)
 
-    # Device
     device = torch.device("cuda" if torch.cuda.is_available() and not args.cpu else "cpu")
 
-    # Load a single slice (raw) and GT (raw)
     case_dir = find_case_dir(args.data_root, args.case_id)
-    raw_img = load_modality_slice(case_dir, args.modalities[0], args.slice_idx)  # [H,W]
-    raw_gt = load_seg_slice(case_dir, args.slice_idx)  # [H,W] binary
+    raw_img = load_modality_slice(case_dir, args.modalities[0], args.slice_idx)  
+    raw_gt = load_seg_slice(case_dir, args.slice_idx) 
 
     panels = [
         ("Full input (k=1,r=1)", args.ckpt_baseline, 1, 1),
@@ -240,25 +219,25 @@ def main(args):
         ("Skip+Down (k=2,r=2)", args.ckpt_s2d2, 2, 2),
     ]
 
-    # 2x2 layout (square-ish)
+    
     fig, axes = plt.subplots(2, 2, figsize=(7.5, 7.5))
     fig.suptitle(f"{args.case_id} | axial slice {args.slice_idx}", fontsize=10, y=0.98)
     axes = axes.ravel()
 
     for ax, (title, ckpt, k, r) in zip(axes, panels):
-        # Preprocess consistent with downsample r:
+        
         img = percentile_clip_zscore(raw_img)
         img_240 = downsample_then_resize(img, downsample=r, target_hw=(240, 240))
         gt_240 = resize_mask_nearest(raw_gt, downsample=r, target_hw=(240, 240))
 
-        # Load model + predict
+        
         model = build_model_from_train_py(in_channels=1)
         model = load_checkpoint_to_model(model, ckpt, device="cpu")
         model.to(device).eval()
 
         pred_240 = predict_mask(model, img_240, device=device, thresh=args.thresh)
 
-        # Metrics on this slice/panel
+        
         metrics = compute_binary_metrics(gt_240, pred_240)
         title_with_metrics = (
             f"{title}\n"
@@ -268,7 +247,6 @@ def main(args):
 
         overlay_contours(ax, img_240, gt_240, pred_240, title_with_metrics)
 
-    # Legend that matches contour colors exactly
     import matplotlib.lines as mlines
     gt_line = mlines.Line2D([], [], color="lime", linewidth=1.8, label="GT (contour)")
     pr_line = mlines.Line2D([], [], color="red", linewidth=1.8, linestyle="--", label="Pred (contour)")

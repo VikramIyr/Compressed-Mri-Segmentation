@@ -20,7 +20,7 @@ from datasets import build_brats_index, split_cases, Brats2DSliceDataset
 # -------------------------
 
 def dice_score_binary(pred: np.ndarray, gt: np.ndarray, eps: float = 1e-7) -> float:
-    """pred, gt are bool arrays with same shape."""
+    
     pred = pred.astype(bool)
     gt = gt.astype(bool)
     inter = np.logical_and(pred, gt).sum()
@@ -29,10 +29,7 @@ def dice_score_binary(pred: np.ndarray, gt: np.ndarray, eps: float = 1e-7) -> fl
 
 
 def hd95_binary_2d(pred: np.ndarray, gt: np.ndarray) -> float:
-    """
-    Robust Hausdorff distance (95th percentile) between 2D binary masks.
-    Returns 0 if both empty, +inf if one empty and other non-empty.
-    """
+
     pred = pred.astype(bool)
     gt = gt.astype(bool)
 
@@ -41,14 +38,14 @@ def hd95_binary_2d(pred: np.ndarray, gt: np.ndarray) -> float:
     if pred.sum() == 0 or gt.sum() == 0:
         return float("inf")
 
-    # Try scipy-based distance transform for speed and stability
+    
     try:
         from scipy.ndimage import binary_erosion, distance_transform_edt
     except Exception:
-        # Fall back to a slower but dependency-free method (KDTree)
+        
         return hd95_binary_2d_kdtree(pred, gt)
 
-    # boundary pixels = mask XOR eroded(mask)
+
     pred_b = np.logical_xor(pred, binary_erosion(pred))
     gt_b = np.logical_xor(gt, binary_erosion(gt))
 
@@ -57,11 +54,9 @@ def hd95_binary_2d(pred: np.ndarray, gt: np.ndarray) -> float:
     if pred_b.sum() == 0 or gt_b.sum() == 0:
         return float("inf")
 
-    # distances from pred boundary to gt boundary
     dt_gt = distance_transform_edt(~gt_b)
     d_pred_to_gt = dt_gt[pred_b]
 
-    # distances from gt boundary to pred boundary
     dt_pred = distance_transform_edt(~pred_b)
     d_gt_to_pred = dt_pred[gt_b]
 
@@ -82,7 +77,6 @@ def hd95_binary_2d_kdtree(pred: np.ndarray, gt: np.ndarray) -> float:
         from scipy.ndimage import binary_erosion
         from scipy.spatial import cKDTree
     except Exception:
-        # As a last resort, return NaN rather than crash
         return float("nan")
 
     pred_b = np.logical_xor(pred, binary_erosion(pred))
@@ -106,30 +100,27 @@ def hd95_binary_2d_kdtree(pred: np.ndarray, gt: np.ndarray) -> float:
     return float(np.percentile(all_d, 95))
 
 
-# -------------------------
-# Model loading
-# -------------------------
 
 def build_model_from_train_py(in_channels: int):
     """
     Tries a few common patterns depending on how your train.py was written.
     Adjust here if your model builder has a different name.
     """
-    # Pattern A: train.py defines build_model(in_channels=...)
+    
     try:
-        from train import build_model  # type: ignore
+        from train import build_model 
         return build_model(in_channels=in_channels)
     except Exception:
         pass
 
-    # Pattern B: train.py defines UNet2D(in_channels=...)
+    
     try:
-        from train import UNet2D  # type: ignore
+        from train import UNet2D 
         return UNet2D(in_channels=in_channels)
     except Exception:
         pass
 
-    # Pattern C: train.py defines UNet(in_channels=...)
+    
     try:
         from train import UNet  # type: ignore
         return UNet(in_channels=in_channels)
@@ -144,25 +135,19 @@ def build_model_from_train_py(in_channels: int):
 
 
 def load_checkpoint_to_model(model, ckpt_path: str, device="cpu"):
-    """
-    Load checkpoints saved in common formats:
-      1) raw state_dict
-      2) dict with 'state_dict' or 'model' or 'model_state_dict'
-      3) Lightning-style 'state_dict'
-    """
+
     ckpt = torch.load(ckpt_path, map_location=device, weights_only=True)
 
 
-    # Case 1: raw state_dict (OrderedDict of parameter tensors)
+    
     if isinstance(ckpt, dict) and all(isinstance(k, str) for k in ckpt.keys()):
-        # Case 2: wrapped dict formats
+        
         for key in ["state_dict", "model", "model_state_dict", "net", "weights"]:
             if key in ckpt and isinstance(ckpt[key], dict):
                 state = ckpt[key]
                 break
         else:
-            # Might STILL be a raw state_dict stored as dict of tensors
-            # Heuristic: look for typical parameter names
+            
             if any(k.endswith(".weight") or k.endswith(".bias") for k in ckpt.keys()):
                 state = ckpt
             else:
@@ -170,12 +155,11 @@ def load_checkpoint_to_model(model, ckpt_path: str, device="cpu"):
     else:
         raise RuntimeError(f"Unrecognized checkpoint object type: {type(ckpt)}")
 
-    # If it looks like Lightning, keys may be prefixed with "model." or "net."
-    # Strip a single leading prefix if needed.
+   
     model_keys = set(model.state_dict().keys())
     state_keys = set(state.keys())
     if len(model_keys.intersection(state_keys)) == 0:
-        # try stripping common prefixes
+        
         for prefix in ["model.", "net.", "module."]:
             stripped = {k[len(prefix):]: v for k, v in state.items() if k.startswith(prefix)}
             if stripped and len(model_keys.intersection(stripped.keys())) > 0:
@@ -193,13 +177,10 @@ def load_checkpoint_to_model(model, ckpt_path: str, device="cpu"):
 
 
 
-# -------------------------
-# Eval
-# -------------------------
+
 def save_summary(args, mean_dice, mean_hd, mean_volerr, num_cases, num_slices, per_case_csv_path):
     os.makedirs(args.out_dir, exist_ok=True)
 
-    # unique id for this eval run
     run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
     tag = f"k{args.slice_stride}_r{args.downsample}_{'_'.join(args.modalities)}_{args.split}"
 
@@ -225,13 +206,12 @@ def save_summary(args, mean_dice, mean_hd, mean_volerr, num_cases, num_slices, p
         "timestamp_iso": datetime.now().isoformat(timespec="seconds"),
     }
 
-    # 1) write a per-run JSON (won't overwrite)
     json_path = os.path.join(args.out_dir, f"summary_{tag}_{run_id}.json")
     with open(json_path, "w") as f:
         json.dump(summary, f, indent=2)
     print(f"Saved summary JSON to: {json_path}")
 
-    # 2) append to a global CSV log
+    
     csv_path = os.path.join(args.out_dir, "summary.csv")
     write_header = not os.path.exists(csv_path)
     with open(csv_path, "a", newline="") as f:
@@ -257,7 +237,7 @@ def evaluate(args):
     else:
         raise ValueError("--split must be train or val")
 
-    # IMPORTANT: include empty slices for honest dice + volume
+    
     ds = Brats2DSliceDataset(
         eval_cases,
         modalities=args.modalities,
@@ -266,7 +246,7 @@ def evaluate(args):
         downsample=args.downsample,
         target_hw=(240, 240),
         keep_empty=True,
-        empty_ratio=1.0,   # keep ALL empty
+        empty_ratio=1.0,   
         seed=args.seed,
     )
 
@@ -278,14 +258,13 @@ def evaluate(args):
         pin_memory=(device.type == "cuda"),
     )
 
-    # Build + load model
+    
     model = build_model_from_train_py(in_channels=len(args.modalities))
     model.to(device)
     model.eval()
     _ = load_checkpoint_to_model(model, args.ckpt)
 
-    # Accumulators (per case)
-    # We'll compute per-slice dice/hd and then mean them per case.
+    
     per_case_dice = defaultdict(list)
     per_case_hd95 = defaultdict(list)
     per_case_pred_vol = defaultdict(float)
@@ -293,12 +272,11 @@ def evaluate(args):
 
     for x, y, meta in dl:
         x = x.to(device, non_blocking=True)
-        y = y.to(device, non_blocking=True)  # shape: [B,H,W] (your dataset returns that)
-        # Forward
+        y = y.to(device, non_blocking=True)  
+        
         out = model(x)
 
-        # Handle common output shapes
-        # - logits [B,1,H,W] or [B,H,W]
+       
         if out.ndim == 4:
             logits = out[:, 0]
         elif out.ndim == 3:
@@ -309,16 +287,16 @@ def evaluate(args):
         prob = torch.sigmoid(logits)
         pred = (prob > args.thresh).to(torch.uint8)
 
-        # Move to CPU numpy
+        
         pred_np = pred.cpu().numpy().astype(bool)
         gt_np = (y > 0).to(torch.uint8).cpu().numpy().astype(bool)
 
-        # meta['case_id'] is a list of strings if collated normally; handle both cases
+        
         case_ids = meta["case_id"]
         if isinstance(case_ids, (list, tuple)):
             case_ids_list = list(case_ids)
         else:
-            # sometimes collate keeps strings as list anyway; but if not, force list
+            
             case_ids_list = [case_ids] * pred_np.shape[0]
 
         for i in range(pred_np.shape[0]):
@@ -330,11 +308,11 @@ def evaluate(args):
             per_case_dice[cid].append(d)
             per_case_hd95[cid].append(h)
 
-            # volume proxy: count pixels per slice; scale by slice_stride to approximate full stack
+            
             per_case_pred_vol[cid] += float(pred_np[i].sum()) * args.slice_stride
             per_case_gt_vol[cid] += float(gt_np[i].sum()) * args.slice_stride
 
-    # Aggregate per-case metrics
+    
     rows = []
     dice_list = []
     hd_list = []
@@ -343,8 +321,7 @@ def evaluate(args):
     for cid in sorted(per_case_dice.keys()):
         cd = float(np.mean(per_case_dice[cid])) if len(per_case_dice[cid]) else float("nan")
 
-        # HD95: ignore inf for mean? -> keep inf (honest), but it can explode the mean.
-        # We'll compute mean over finite values; if all inf, report inf.
+        
         hvals = np.array(per_case_hd95[cid], dtype=np.float64)
         finite = np.isfinite(hvals)
         if finite.any():
@@ -382,7 +359,7 @@ def evaluate(args):
 
     print(f"Saved per-case metrics to: {out_csv}")
 
-    # Save the printed summary too (JSON + append to summary.csv)
+    
     save_summary(
         args=args,
         mean_dice=mean_dice,

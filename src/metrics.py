@@ -3,10 +3,7 @@ import torch
 
 @torch.no_grad()
 def dice_binary_from_logits(logits: torch.Tensor, target: torch.Tensor, eps: float = 1e-6) -> float:
-    """
-    logits: (B,1,H,W)
-    target: (B,H,W) with {0,1}
-    """
+
     probs = torch.sigmoid(logits)
     pred = (probs > 0.5).float()
     tgt = target.float().unsqueeze(1)  # (B,1,H,W)

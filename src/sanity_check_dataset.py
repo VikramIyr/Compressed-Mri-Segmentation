@@ -11,15 +11,15 @@ from datasets import (
 def main():
     set_seed(0)
 
-    # IMPORTANT: your extracted folders are directly under ./data/
+   
     brats_root = os.environ.get("BRATS_ROOT", "data")
 
-    # Start simple: FLAIR only (fast + stable)
+   
     modalities = ["flair"]
 
     print("BRATS_ROOT =", brats_root)
     cases = build_brats_index(brats_root, modalities=modalities)
-    cases = cases[:10]   # << add this line temporarily
+    cases = cases[:10]   
     train_cases, val_cases = split_cases(cases, val_ratio=0.2, seed=0)
 
 
@@ -29,9 +29,9 @@ def main():
     ds = Brats2DSliceDataset(
         train_cases,
         modalities=modalities,
-        slice_axis=2,          # axial
-        slice_stride=1,        # baseline (set 2 for compressed)
-        downsample=1,          # baseline (set 2 for compressed)
+        slice_axis=2,
+        slice_stride=1,
+        downsample=1,
         target_hw=(240, 240),
         keep_empty=True,
         empty_ratio=0.25,
@@ -43,11 +43,10 @@ def main():
     dl = DataLoader(ds, batch_size=4, shuffle=True, num_workers=0)
 
     x, y, meta = next(iter(dl))
-    print("Batch x:", x.shape, x.dtype)   # (B,C,H,W)
-    print("Batch y:", y.shape, y.dtype)   # (B,H,W)
+    print("Batch x:", x.shape, x.dtype)   
+    print("Batch y:", y.shape, y.dtype)   
 
-    # meta comes back as dict of lists/tensors depending on collate;
-    # print a readable sample
+    
     try:
         example = {k: meta[k][0] for k in meta}
     except Exception:

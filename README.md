@@ -16,14 +16,13 @@ We investigate two compression strategies:
 - **Spatial downsampling**: reducing in-plane resolution by factor *r*
 
 We evaluate the resulting trade-offs using:
-- Dice score (overlap)
-- HD95 (boundary accuracy)
-- Tumor volume error (proxy)
+- Dice score 
+- HD95 
+- Tumor volume error 
 
 All experiments:
 - use a **standard 2D U-Net**
 - are trained **from scratch**
-- are run on **consumer-grade hardware (single GPU)**
 
 ---
 
@@ -31,27 +30,30 @@ All experiments:
 
 ```text
 .
-├── data/                     # BraTS 2021 dataset (not included)
+├── data/                     
 │   └── BraTS2021_XXXXX/
 │
 ├── src/
-│   ├── train.py              # Training script
-│   ├── eval.py               # Evaluation script (per-case metrics)
-│   ├── datasets.py           # BraTS dataset utilities
+│   ├── train.py              
+│   ├── eval.py               
+│   ├── datasets.py           
+utilities
 │
 ├── scripts/
-│   └── make_figures.py       # Generates all report figures
+│   └── make_figures.py       
+ figures
 │
 ├── runs/
-│   ├── baseline/             # k=1, r=1
-│   ├── stride2/              # k=2, r=1
-│   ├── down2/                # k=1, r=2
-│   ├── s2_d2/                # k=2, r=2
+│   ├── baseline/            
+│   ├── stride2/              
+│   ├── down2/                
+│   ├── s2_d2/                
 │   └── eval/
-│       ├── metrics.csv       # Per-case metrics
-│       └── summary.csv       # Aggregated experiment results
+│       ├── metrics.csv       
+│       └── summary.csv       
+results
 │
-├── figures/                  # Auto-generated figures for report
+├── figures/                  
 │
 ├── requirements.txt
 └── README.md
@@ -68,15 +70,7 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-Required packages include:
 
-- PyTorch
-- NumPy
-- SciPy
-- Pandas
-- Matplotlib
-
-⚠️ scipy is strongly recommended for stable HD95 computation.
 
 ### 3.2 Hardware
 Experiments were run on:
@@ -102,14 +96,8 @@ Each case directory must contain:
 - *_t1ce.nii.gz (optional)
 - *_seg.nii.gz
 
-### Dataset Sanity Check (Recommended)
+### Dataset Sanity Check
 
-Before training, we strongly recommend running a dataset sanity check to verify that:
-
-- All cases are detected correctly  
-- 2D slices are generated as expected  
-- Shapes and dtypes match the model input  
-- Tumor labels are present in the batches  
 
 Run:
 
@@ -128,7 +116,8 @@ python src/train.py \
   --batch_size 8 \
   --modalities flair \
   --slice_stride 1 \
-  --downsample 1
+  --downsample 1 \
+  --loss bce
 ```
 
 ### 5.2 Slice Skipping (k = 2)
@@ -141,9 +130,21 @@ python src/train.py \
   --modalities flair \
   --slice_stride 2 \
   --downsample 1
+  --loss bce
 ```
+### 5.3 Spatial Downsampling (r = 3)
 
-### 5.3 Spatial Downsampling (r = 2)
+```bash
+python src/train.py \
+  --run_dir runs/down2 \
+  --epochs 10 \
+  --batch_size 8 \
+  --modalities flair \
+  --slice_stride 3 \
+  --downsample 1
+  --loss bce
+```
+### 5.4 Spatial Downsampling (r = 2)
 
 ```bash
 python src/train.py \
@@ -153,9 +154,11 @@ python src/train.py \
   --modalities flair \
   --slice_stride 1 \
   --downsample 2
+  --loss bce
 ```
 
-### 5.4 Combined Compression (k = 2, r = 2)
+
+### 5.5 Combined Compression (k = 2, r = 2)
 
 ```bash
 python src/train.py \
@@ -165,8 +168,32 @@ python src/train.py \
   --modalities flair \
   --slice_stride 2 \
   --downsample 2
+  --loss bce
 ```
 
+### 5.6 Baseline Dice Loss (No Compression)
+
+```bash
+python src/train.py \
+  --run_dir runs/baseline_dice \
+  --epochs 10 \
+  --batch_size 8 \
+  --modalities flair \
+  --slice_stride 1 \
+  --downsample 1 \
+  --loss dice
+```
+### 5.7 Slice Skipping Dice Loss(k = 2)
+```bash
+python src/train.py \
+  --run_dir runs/stride2_dice \
+  --epochs 10 \
+  --batch_size 8 \
+  --modalities flair \
+  --slice_stride 2 \
+  --downsample 1 \
+  --loss dice
+```
 Each run automatically saves:
 
 ```text
@@ -175,9 +202,8 @@ runs/<run_name>/best.pt
 based on validation Dice score.
 
 ## 6. Evaluation
-Evaluation computes per-case metrics and aggregates them.
 
-### 6.1 Run Evaluation for a Single Model
+### 6.1 Run Evaluation for the models
 
 ```bash
 python src/eval.py \
@@ -187,11 +213,30 @@ python src/eval.py \
   --downsample 1 \
   --split val
 ```
-
-Output:
-
-Console summary (mean Dice, HD95, volume error)
-
+```bash
+python src/eval.py \
+  --ckpt runs/stride2/best.pt \
+  --modalities flair \
+  --split val \
+  --slice_stride 2 \
+  --downsample 1 \
+  ```
+```bash
+python src/eval.py \
+  --ckpt runs/down2/best.pt \
+  --modalities flair \
+  --split val \
+  --slice_stride 1 \
+  --downsample 2 \
+  ```
+```bash
+python src/eval.py \
+  --ckpt runs/s2_d2/best.pt \
+  --modalities flair \
+  --split val \
+  --slice_stride 2 \
+  --downsample 2 \
+```
 CSV file:
 
 ```text
@@ -204,9 +249,9 @@ Each evaluation appends results to:
 ```text
 runs/eval/summary.csv
 ```
-This file is used for figure generation and tables.
+You can find the model weights here: https://drive.google.com/drive/folders/1VulB8fbILH1lGaE6aeTNv4yDAlR9i0vb?usp=sharing
 
-## 7. Figure Generation (for Report)
+## 7. Figure Generation 
 
 ### Qualitative Compression Figure
 
