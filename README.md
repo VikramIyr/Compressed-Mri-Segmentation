@@ -88,13 +88,8 @@ Extract into the data/ directory:
 data/
 └── BraTS2021_00000/
 └── BraTS2021_00001/
-└── ...
+└── 
 ```
-Each case directory must contain:
-
-- *_flair.nii.gz
-- *_t1ce.nii.gz (optional)
-- *_seg.nii.gz
 
 ### Dataset Sanity Check
 
