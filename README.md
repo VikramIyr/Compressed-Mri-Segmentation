@@ -251,6 +251,8 @@ runs/eval/summary.csv
 ```
 You can find the model weights here: https://drive.google.com/drive/folders/1VulB8fbILH1lGaE6aeTNv4yDAlR9i0vb?usp=sharing
 
+To be put under the folder runs in a folder of the name of the type.
+
 ## 7. Figure Generation 
 
 ### Qualitative Compression Figure
