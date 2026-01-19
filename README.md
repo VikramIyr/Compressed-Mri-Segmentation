@@ -102,6 +102,20 @@ Each case directory must contain:
 - *_t1ce.nii.gz (optional)
 - *_seg.nii.gz
 
+### Dataset Sanity Check (Recommended)
+
+Before training, we strongly recommend running a dataset sanity check to verify that:
+
+- All cases are detected correctly  
+- 2D slices are generated as expected  
+- Shapes and dtypes match the model input  
+- Tumor labels are present in the batches  
+
+Run:
+
+```bash
+python src/sanity_check_dataset.py
+```
 ## 5. Training Experiments
 All training runs use the same architecture and optimizer, differing only in compression settings.
 
