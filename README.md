@@ -193,48 +193,23 @@ runs/eval/summary.csv
 This file is used for figure generation and tables.
 
 ## 7. Figure Generation (for Report)
-All plots in the report are generated automatically.
+
+### Qualitative Compression Figure
+
+To generate the qualitative comparison figure (same subject and slice under different compression settings):
 
 ```bash
-python scripts/make_figures.py \
-  --summary runs/eval/summary.csv \
-  --out_dir figures \
-  --split val \
-  --modality flair
+python scripts/figure_qualitative_compression.py \
+  --cpu \
+  --data_root data \
+  --case_id BraTS2021_00000 \
+  --slice_idx 80 \
+  --modalities flair \
+  --ckpt_baseline runs/baseline/best.pt \
+  --ckpt_stride2 runs/stride2/best.pt \
+  --ckpt_down2 runs/down2/best.pt \
+  --ckpt_s2d2 runs/s2_d2/best.pt
 ```
 
-Generated figures:
 
-- dice_vs_compression.png
-- hd95_vs_compression.png
-- volerr_vs_compression.png
-- tradeoff_dice_vs_hd95.png
 
-An aggregated CSV is also saved:
-
-```text
-figures/agg_results.csv
-```
-
-## 8. Reproducing the Paper Results (Checklist)
-To fully reproduce the report:
-
-- Install environment
-- Download BraTS 2021
-- Train all four models
-- Run evaluation for each checkpoint
-- Generate figures
-- Insert figures + table into LaTeX report
-
-No manual tuning or post-processing is required.
-
-## 9. Notes & Design Choices
-- 2D slice-wise formulation is intentional to isolate input compression effects
-- Empty slices are included during evaluation for honest volume metrics
-- HD95 is computed per slice and aggregated per case
-- Volume is approximated using slice count × stride
-
-## 10. License & Acknowledgements
-- Dataset: BraTS 2021
-- Architecture: U-Net (Ronneberger et al.)
-- Project developed for academic coursework at ETH Zürich
