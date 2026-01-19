@@ -124,7 +124,7 @@ All training runs use the same architecture and optimizer, differing only in com
 ```bash
 python src/train.py \
   --run_dir runs/baseline \
-  --epochs 6 \
+  --epochs 10 \
   --batch_size 8 \
   --modalities flair \
   --slice_stride 1 \
@@ -136,7 +136,7 @@ python src/train.py \
 ```bash
 python src/train.py \
   --run_dir runs/stride2 \
-  --epochs 6 \
+  --epochs 10 \
   --batch_size 8 \
   --modalities flair \
   --slice_stride 2 \
@@ -148,7 +148,7 @@ python src/train.py \
 ```bash
 python src/train.py \
   --run_dir runs/down2 \
-  --epochs 6 \
+  --epochs 10 \
   --batch_size 8 \
   --modalities flair \
   --slice_stride 1 \
@@ -160,7 +160,7 @@ python src/train.py \
 ```bash
 python src/train.py \
   --run_dir runs/s2_d2 \
-  --epochs 6 \
+  --epochs 10 \
   --batch_size 8 \
   --modalities flair \
   --slice_stride 2 \
